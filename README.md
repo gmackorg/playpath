@@ -10,7 +10,7 @@ Add to your `wally.toml`:
 
 ```toml
 [dependencies]
-PlayPath = "gmackorg/playpath@0.1.0"
+PlayPath = "gmackie/playpath@0.1.0"
 ```
 
 Then run:
