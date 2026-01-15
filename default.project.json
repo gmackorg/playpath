@@ -1,0 +1,6 @@
+{
+  "name": "PlayPath",
+  "tree": {
+    "$path": "src/PlayPath.lua"
+  }
+}

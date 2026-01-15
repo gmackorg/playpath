@@ -1,0 +1,12 @@
+[package]
+name = "gmackorg/playpath"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "server"
+license = "MIT"
+description = "PlayPath learning platform SDK for Roblox - adaptive questions, mastery tracking, and event batching"
+authors = ["gmackorg"]
+include = ["src", "default.project.json", "README.md", "LICENSE"]
+exclude = ["docs"]
+
+[dependencies]
