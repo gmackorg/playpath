@@ -39,6 +39,8 @@ local DefaultOpenApiV1 = {
 		standards = "/api/v1/standards",
 		capabilities = "/api/v1/capabilities",
 		profileBase = "/api/v1/profile",
+		playStart = "/api/v1/play/start",
+		playBlueprints = "/api/v1/play/blueprints",
 	},
 	buildSessionPath = function(sessionId)
 		return "/api/v1/sessions/" .. sessionId
@@ -52,6 +54,45 @@ local DefaultOpenApiV1 = {
 	buildProfilePath = function(profileId)
 		return "/api/v1/profile/" .. profileId
 	end,
+	buildPlayChallengePath = function(sessionId, action)
+		return "/api/v1/play/" .. sessionId .. "/challenge/" .. action
+	end,
+	buildPlayQuestPath = function(sessionId)
+		return "/api/v1/play/" .. sessionId .. "/quest/complete"
+	end,
+	buildPlayDialogPath = function(sessionId)
+		return "/api/v1/play/" .. sessionId .. "/dialog/advance"
+	end,
+	buildPlayNpcPath = function(sessionId)
+		return "/api/v1/play/" .. sessionId .. "/npc/interact"
+	end,
+	buildPlayTelemetryPath = function(sessionId)
+		return "/api/v1/play/" .. sessionId .. "/telemetry"
+	end,
+	buildPlayCompletePath = function(sessionId)
+		return "/api/v1/play/" .. sessionId .. "/complete"
+	end,
+}
+
+PlayPath.Events = {
+	ZONE_ENTER = "zone_enter",
+	ZONE_EXIT = "zone_exit",
+	NPC_INTERACT = "npc_interact",
+	CHALLENGE_VIEW = "challenge_view",
+	CHALLENGE_START = "challenge_start",
+	CHALLENGE_RESPOND = "challenge_respond",
+	CHALLENGE_COMPLETE = "challenge_complete",
+	HINT_REQUEST = "hint_request",
+	QUEST_ACCEPT = "quest_accept",
+	QUEST_COMPLETE = "quest_complete",
+	DIALOG_START = "dialog_start",
+	DIALOG_CHOICE = "dialog_choice",
+	DIALOG_END = "dialog_end",
+	ITEM_COLLECT = "item_collect",
+	PLAYER_IDLE = "player_idle",
+	SESSION_PAUSE = "session_pause",
+	SESSION_RESUME = "session_resume",
+	CUSTOM = "custom",
 }
 
 local function resolveOpenApiV1()
@@ -355,6 +396,28 @@ export type Session = {
 export type QuestionOptions = {
 	skill: string?,
 	context: { [string]: any }?,
+}
+
+export type PlaySession = {
+	sessionId: string,
+	player: Player,
+	character: any,
+	shell: any,
+	theme: any,
+	world: any,
+	challenges: { any },
+	quests: { any },
+	storyArc: any,
+
+	challengeStart: (self: PlaySession, challengeId: string) -> any,
+	challengeRespond: (self: PlaySession, challengeId: string, response: any, responseTimeMs: number, hintUsed: boolean?) -> any,
+	challengeHint: (self: PlaySession, challengeId: string, hintIndex: number?) -> any,
+	questComplete: (self: PlaySession, questId: string) -> any,
+	dialogAdvance: (self: PlaySession, npcId: string, choiceIndex: number?) -> any,
+	npcInteract: (self: PlaySession, entityId: string) -> any,
+	trackEvent: (self: PlaySession, eventType: string, data: { [string]: any }?) -> (),
+	flush: (self: PlaySession) -> any,
+	complete: (self: PlaySession) -> any,
 }
 
 -- Internal types
@@ -1812,6 +1875,189 @@ function Mock.handle(
 			{}
 	end
 
+	-- GET /api/v1/play/blueprints
+	if method == "GET" and string.match(path, "^/api/v1/play/blueprints") then
+		return 200, HttpService:JSONEncode({
+			blueprints = {
+				{
+					id = uuid(),
+					subject = "Math",
+					gradeLevel = 4,
+					challengeCount = 5,
+					estimatedMinutes = 15,
+					status = "approved",
+					storyTitle = "The Crystal Caves of Numerica",
+					shellCode = "adventure",
+					createdAt = "2026-01-15T10:00:00Z",
+				},
+				{
+					id = uuid(),
+					subject = "ELA",
+					gradeLevel = 4,
+					challengeCount = 4,
+					estimatedMinutes = 12,
+					status = "approved",
+					storyTitle = "The Word Wizard's Tower",
+					shellCode = "adventure",
+					createdAt = "2026-01-14T10:00:00Z",
+				},
+			},
+			profileId = "roblox-0",
+			linked = true,
+			nextCursor = nil,
+		}), {}
+	end
+
+	-- POST /api/v1/play/start
+	if method == "POST" and path == OpenApiV1.paths.playStart then
+		local sessionId = uuid()
+		return 200, HttpService:JSONEncode({
+			sessionId = sessionId,
+			character = {
+				id = uuid(),
+				name = "Luna",
+				setting = "A magical forest",
+				desires = "To find the lost star crystals",
+				traits = { "curious", "brave" },
+				companion = { name = "Pip", type = "fox", description = "A clever fox companion" },
+			},
+			shell = {
+				id = uuid(),
+				code = "adventure",
+				name = "Adventure",
+				loopType = "quest",
+				rendererHint = "3d",
+			},
+			theme = {
+				id = uuid(),
+				code = "forest",
+				name = "Enchanted Forest",
+				palette = { primary = "#2d5016", secondary = "#8bc34a", accent = "#ffd700", background = "#1a0f2e", text = "#ffffff" },
+				vocabulary = {},
+			},
+			world = {
+				zones = {
+					{ id = "zone-1", name = "Crystal Clearing", description = "A sunlit clearing" },
+					{ id = "zone-2", name = "Deep Woods", description = "Dark and mysterious" },
+				},
+				quests = {
+					{ id = "quest-1", title = "Find the First Crystal", objectives = { { id = "obj-1", description = "Talk to the forest guide" } } },
+				},
+				startZoneId = "zone-1",
+				playerSpawn = { x = 0, y = 0 },
+			},
+			challenges = {
+				{
+					id = uuid(),
+					sequence = 1,
+					mechanicCode = "multiple_choice",
+					inputShape = "multipleChoice",
+					difficulty = 4,
+					narrativeMoment = "The crystal glows with a math puzzle",
+					storyIntegration = "Solve to unlock the crystal",
+					content = {
+						prompt = "What is 3/4 + 1/4?",
+						options = { { id = "a", label = "1" }, { id = "b", label = "2/4" }, { id = "c", label = "1/2" } },
+					},
+					skillAtomCode = "math.fractions.add",
+					skillAtomTitle = "Adding Fractions",
+				},
+			},
+			quests = {
+				{ id = "quest-1", title = "Find the First Crystal", objectives = { { id = "obj-1", description = "Talk to the forest guide" } } },
+			},
+			storyArc = {
+				title = "The Crystal Caves of Numerica",
+				introduction = "Long ago, the crystals of knowledge were scattered...",
+				conclusion = "With all crystals collected, the forest blooms again!",
+			},
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/challenge/start
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/challenge/start$") then
+		return 200, HttpService:JSONEncode({
+			started = true,
+			serverTimestamp = nowUnixMilliseconds(),
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/challenge/respond
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/challenge/respond$") then
+		return 200, HttpService:JSONEncode({
+			correct = true,
+			feedback = "Great job!",
+			explanation = "3/4 + 1/4 = 4/4 = 1",
+			masteryDelta = 0.1,
+			masteryLevel = 0.6,
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/challenge/hint
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/challenge/hint$") then
+		return 200, HttpService:JSONEncode({
+			hint = "Think about what happens when the denominators are the same.",
+			hintIndex = 0,
+			totalHints = 3,
+			isLastHint = false,
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/quest/complete
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/quest/complete$") then
+		return 200, HttpService:JSONEncode({
+			valid = true,
+			rewardText = "The crystal glows brightly!",
+			unlockedQuests = {},
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/dialog/advance
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/dialog/advance$") then
+		return 200, HttpService:JSONEncode({
+			nextLine = { speaker = "Forest Guide", text = "Welcome, traveler! The crystals await.", choices = nil },
+			complete = false,
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/npc/interact
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/npc/interact$") then
+		return 200, HttpService:JSONEncode({
+			interactionType = "dialog",
+			dialogLine = { speaker = "Forest Guide", text = "Hello there!", choices = nil },
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/telemetry
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/telemetry$") then
+		local eventCount = 0
+		if type(body.events) == "table" then
+			eventCount = #body.events
+		end
+		return 200, HttpService:JSONEncode({
+			accepted = eventCount,
+			rejected = 0,
+		}), {}
+	end
+
+	-- POST /api/v1/play/:id/complete
+	if method == "POST" and string.match(path, "^/api/v1/play/[^/]+/complete$") then
+		return 200, HttpService:JSONEncode({
+			summary = {
+				challengesCompleted = 5,
+				challengesCorrect = 4,
+				totalChallenges = 5,
+				accuracy = 0.8,
+				questsCompleted = 1,
+				totalQuests = 1,
+				timeSpentSeconds = 600,
+				skillsWorked = {},
+				zoneBreakdown = {},
+				highlights = {},
+			},
+		}), {}
+	end
+
 	-- Unknown endpoint
 	return 404,
 		HttpService:JSONEncode({
@@ -2522,6 +2768,173 @@ function SessionImpl:endSession(): any
 end
 
 --------------------------------------------------------------------------------
+-- 9b) PlaySession Class
+--------------------------------------------------------------------------------
+
+local PlaySessionImpl = {}
+PlaySessionImpl.__index = PlaySessionImpl
+
+function PlaySessionImpl.new(player: Player, client: any, logger: any, startResp: any, cfg: InitConfig)
+	local self = setmetatable({
+		-- Public properties (from /play/start response)
+		sessionId = startResp.sessionId,
+		player = player,
+		character = startResp.character,
+		shell = startResp.shell,
+		theme = startResp.theme,
+		world = startResp.world,
+		challenges = startResp.challenges or {},
+		quests = startResp.quests or {},
+		storyArc = startResp.storyArc,
+
+		-- Internal state
+		_client = client,
+		_logger = logger,
+		_cfg = cfg,
+		_state = "ACTIVE" :: SessionState,
+		_startedAtMs = nowUnixMilliseconds(),
+
+		-- Event batching (same pattern as SessionImpl)
+		_eventQueue = {},
+		_flushThread = nil :: thread?,
+	}, PlaySessionImpl)
+
+	-- Start flush loop
+	self:_startFlushLoop()
+
+	return (self :: any) :: PlaySession
+end
+
+function PlaySessionImpl:_startFlushLoop()
+	local interval = self._cfg.eventFlushInterval or DEFAULT_FLUSH_INTERVAL
+	self._flushThread = task.spawn(function()
+		while self._state == "ACTIVE" do
+			task.wait(interval)
+			if self._state ~= "ACTIVE" then break end
+			if not isPlayerAlive(self.player) then
+				self._state = "ENDED"
+				break
+			end
+			if #self._eventQueue > 0 then
+				self:flush()
+			end
+		end
+	end)
+end
+
+function PlaySessionImpl:challengeStart(challengeId: string): any
+	if self._state ~= "ACTIVE" then
+		return Promise.reject(Errors.make("SESSION_NOT_ACTIVE", "Play session is not active", nil, false, nil, nil))
+	end
+	local path = OpenApiV1.buildPlayChallengePath(self.sessionId, "start")
+	return self._client:request("POST", path, { challengeId = challengeId })
+end
+
+function PlaySessionImpl:challengeRespond(challengeId: string, response: any, responseTimeMs: number, hintUsed: boolean?): any
+	if self._state ~= "ACTIVE" then
+		return Promise.reject(Errors.make("SESSION_NOT_ACTIVE", "Play session is not active", nil, false, nil, nil))
+	end
+	local path = OpenApiV1.buildPlayChallengePath(self.sessionId, "respond")
+	return self._client:request("POST", path, {
+		challengeId = challengeId,
+		response = response,
+		responseTimeMs = responseTimeMs,
+		hintUsed = hintUsed or false,
+		idempotencyKey = uuid(),
+	})
+end
+
+function PlaySessionImpl:challengeHint(challengeId: string, hintIndex: number?): any
+	if self._state ~= "ACTIVE" then
+		return Promise.reject(Errors.make("SESSION_NOT_ACTIVE", "Play session is not active", nil, false, nil, nil))
+	end
+	local path = OpenApiV1.buildPlayChallengePath(self.sessionId, "hint")
+	local body: any = { challengeId = challengeId }
+	if hintIndex ~= nil then
+		body.hintIndex = hintIndex
+	end
+	return self._client:request("POST", path, body)
+end
+
+function PlaySessionImpl:questComplete(questId: string): any
+	if self._state ~= "ACTIVE" then
+		return Promise.reject(Errors.make("SESSION_NOT_ACTIVE", "Play session is not active", nil, false, nil, nil))
+	end
+	local path = OpenApiV1.buildPlayQuestPath(self.sessionId)
+	return self._client:request("POST", path, { questId = questId })
+end
+
+function PlaySessionImpl:dialogAdvance(npcId: string, choiceIndex: number?): any
+	if self._state ~= "ACTIVE" then
+		return Promise.reject(Errors.make("SESSION_NOT_ACTIVE", "Play session is not active", nil, false, nil, nil))
+	end
+	local path = OpenApiV1.buildPlayDialogPath(self.sessionId)
+	local body: any = { npcId = npcId }
+	if choiceIndex ~= nil then
+		body.choiceIndex = choiceIndex
+	end
+	return self._client:request("POST", path, body)
+end
+
+function PlaySessionImpl:npcInteract(entityId: string): any
+	if self._state ~= "ACTIVE" then
+		return Promise.reject(Errors.make("SESSION_NOT_ACTIVE", "Play session is not active", nil, false, nil, nil))
+	end
+	local path = OpenApiV1.buildPlayNpcPath(self.sessionId)
+	return self._client:request("POST", path, { entityId = entityId })
+end
+
+function PlaySessionImpl:trackEvent(eventType: string, data: { [string]: any }?)
+	if self._state ~= "ACTIVE" then return end
+	local event = {
+		type = eventType,
+		timestamp = nowUnixMilliseconds(),
+		data = data or {},
+		idempotencyKey = uuid(),
+	}
+	self._eventQueue[#self._eventQueue + 1] = event
+	-- Auto-flush if threshold reached
+	local threshold = self._cfg.eventFlushThreshold or DEFAULT_FLUSH_THRESHOLD
+	if #self._eventQueue >= threshold then
+		self:flush()
+	end
+end
+
+function PlaySessionImpl:flush(): any
+	if #self._eventQueue == 0 then
+		return Promise.resolve({ accepted = 0, rejected = 0 })
+	end
+	local events = self._eventQueue
+	self._eventQueue = {}
+	local path = OpenApiV1.buildPlayTelemetryPath(self.sessionId)
+	return self._client:request("POST", path, { events = events })
+end
+
+function PlaySessionImpl:complete(): any
+	if self._state ~= "ACTIVE" then
+		return Promise.reject(Errors.make("SESSION_NOT_ACTIVE", "Play session is not active", nil, false, nil, nil))
+	end
+	self._state = "ENDING"
+
+	-- Flush remaining events first, then complete
+	return self:flush()
+		:catch(function(_)
+			return nil -- Ignore flush errors during teardown
+		end)
+		:andThen(function()
+			local path = OpenApiV1.buildPlayCompletePath(self.sessionId)
+			return self._client:request("POST", path, {})
+		end)
+		:finally(function()
+			self._state = "ENDED"
+			if self._flushThread then
+				task.cancel(self._flushThread)
+				self._flushThread = nil
+			end
+		end)
+end
+
+--------------------------------------------------------------------------------
 -- 10) PlayPath Public API
 --------------------------------------------------------------------------------
 
@@ -2605,6 +3018,46 @@ function PlayPath.createSession(player: Player, opts: CreateSessionOptions?): an
 
 		local session = SessionImpl.new(player, _client, _logger, resp, _cfg :: InitConfig)
 		return session
+	end)
+end
+
+function PlayPath.getBlueprints(player: Player): any
+	if not _initialized or _cfg == nil or _client == nil then
+		return Promise.reject(
+			Errors.make("SDK_NOT_INITIALIZED", "PlayPath.init() must be called before getBlueprints()", nil, false, nil, nil)
+		)
+	end
+	if not isPlayerAlive(player) then
+		return Promise.reject(Errors.make("PLAYER_LEFT", "Player is not in the game", nil, false, nil, nil))
+	end
+	local profileId = profileIdForUserId(player.UserId, _cfg)
+	local path = OpenApiV1.paths.playBlueprints .. "?profileId=" .. profileId .. "&status=approved"
+	return _client:request("GET", path, nil)
+end
+
+function PlayPath.startPlay(player: Player, opts: { blueprintId: string }): any
+	if not _initialized or _cfg == nil or _client == nil then
+		return Promise.reject(
+			Errors.make("SDK_NOT_INITIALIZED", "PlayPath.init() must be called before startPlay()", nil, false, nil, nil)
+		)
+	end
+	if not isPlayerAlive(player) then
+		return Promise.reject(Errors.make("PLAYER_LEFT", "Player is not in the game", nil, false, nil, nil))
+	end
+	if type(opts) ~= "table" or type(opts.blueprintId) ~= "string" then
+		return Promise.reject(Errors.make("INVALID_CONFIG", "opts.blueprintId is required", nil, false, nil, nil))
+	end
+
+	local body = {
+		blueprintId = opts.blueprintId,
+		profileId = profileIdForUserId(player.UserId, _cfg),
+	}
+
+	return _client:request("POST", OpenApiV1.paths.playStart, body):andThen(function(resp: any)
+		if not isPlayerAlive(player) then
+			return Promise.reject(Errors.make("PLAYER_LEFT", "Player left during play session creation", nil, false, nil, nil))
+		end
+		return PlaySessionImpl.new(player, _client, _logger, resp, _cfg :: InitConfig)
 	end)
 end
 

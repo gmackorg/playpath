@@ -1,3 +1,6 @@
+> **Legacy API** — This documents the quiz-mode SDK API. For the recommended narrative Play API,
+> see [PLAY_API.md](./PLAY_API.md). The legacy API continues to work and is fully supported.
+
 # PlayPath Roblox v1 REST API (Lua SDK)
 
 This document describes the v1 REST contract targeted by `src/PlayPath.lua`.

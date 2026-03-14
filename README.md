@@ -20,6 +20,53 @@ Recommended reading order for most studios:
 2. read the integration guide
 3. run the launch checklist
 
+## Play API (Narrative Engine)
+
+The Play API is the recommended integration path for new games. It delivers
+complete narrative learning worlds with zones, quests, NPCs, branching dialog,
+and server-authoritative challenges — replacing the legacy quiz-mode loop.
+
+**Documentation:**
+- [PLAY_API.md](./PLAY_API.md) — Complete REST API reference
+- [EVENT_MODEL.md](./EVENT_MODEL.md) — Event system and telemetry guide
+- [Unity Quickstart](./docs/guides/unity-quickstart.md) — C# integration guide
+- [Godot Quickstart](./docs/guides/godot-quickstart.md) — GDScript integration guide
+
+**Quick example (Roblox):**
+
+```lua
+local PlayPath = require(game.ReplicatedStorage.PlayPath)
+
+PlayPath.init({
+    gameKeyId = "your-game-key-id",
+    apiKeySecret = "your-api-secret",
+})
+
+-- Start a narrative play session
+PlayPath.startPlay(blueprintId, profileId)
+    :andThen(function(session)
+        -- session contains the full world: zones, NPCs, challenges, quests
+        print(session.sessionId)
+        print(session.world)        -- zones and entities to render
+        print(session.challenges)   -- challenges (answers withheld)
+        print(session.storyArc)     -- narrative arc metadata
+
+        -- Challenge loop (server-authoritative grading)
+        return session:challengeStart("ch_fraction_01")
+    end)
+    :andThen(function(result)
+        -- Submit answer, get grade + mastery update
+        return session:challengeRespond("ch_fraction_01", "b", 3500, false)
+    end)
+    :andThen(function(grade)
+        print(grade.correct, grade.feedback, grade.masteryLevel)
+    end)
+```
+
+The legacy quiz-mode API (`createSession`, `getNextQuestion`, `submitAnswer`)
+continues to work and is fully supported. See [ROBLOX_SDK_API.md](./ROBLOX_SDK_API.md)
+for legacy API documentation.
+
 ## Installation
 
 ### With Wally (recommended)
