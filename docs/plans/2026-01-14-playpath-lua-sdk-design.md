@@ -38,7 +38,7 @@ local PlayPath = require(game.ReplicatedStorage.PlayPath)
 PlayPath.init({
     gameKeyId = "your-game-key-id",      -- required
     apiKeySecret = "your-secret",         -- required
-    baseUrl = "https://api.playpath.io",  -- optional, has default
+    baseUrl = "https://play.gmac.io",     -- optional, has default
     maxRetries = 3,                        -- optional
     retryBackoffMs = 1000,                 -- optional
     eventFlushInterval = 5,                -- seconds, optional
@@ -291,16 +291,18 @@ Required surface:
 ### Request Signing
 
 ```lua
-local timestamp = tostring(os.time())
-local bodyHash = Crypto.sha256Hex(bodyJson)
-local canonical = string.format("%s:%s:%s:%s", timestamp, method, path, bodyHash)
-local signature = Crypto.hmacSha256Hex(apiKeySecret, canonical)
+local timestampMs = tostring(os.time() * 1000)
+local nonce = HttpService:GenerateGUID(false)
+local bodySha256Hex = Crypto.sha256Hex(bodyJson)
+local canonical = string.format("%s:%s:%s:%s:%s", timestampMs, nonce, method, path, bodySha256Hex)
+local signature = "sha256=" .. Crypto.hmacSha256Hex(apiKeySecret, canonical)
 
 headers = {
     ["Content-Type"] = "application/json",
-    ["X-Game-Key-Id"] = gameKeyId,
-    ["X-Timestamp"] = timestamp,
-    ["X-Signature"] = signature,
+    ["x-api-key"] = gameKeyId,
+    ["x-timestamp"] = timestampMs,
+    ["x-nonce"] = nonce,
+    ["x-signature"] = signature,
 }
 ```
 
@@ -333,10 +335,10 @@ headers = {
 
 ### Transitions
 ```
-CREATING → ACTIVE  (on /sessions/start success)
+CREATING → ACTIVE  (on POST /api/v1/sessions success)
 CREATING → ENDED   (on start failure or player leaves)
 ACTIVE → ENDING    (on endSession() called)
-ENDING → ENDED     (on /sessions/:id/end completes)
+ENDING → ENDED     (on POST /api/v1/sessions/{sessionId} completes)
 ACTIVE → ENDED     (on 401/404 for session-bound calls)
 ```
 
@@ -394,37 +396,37 @@ end)
 
 ### Endpoint Responses
 
-**POST /api/v1/sessions/start**
+**POST /api/v1/sessions**
 - `sessionId = uuid()`
 - `linked = (robloxUserId % 2 == 0)` (deterministic)
 - If linked: `student = { id, displayName }`, `pairingCode = nil`
 - If unlinked: `student = nil`, `pairingCode = "ABC123"`
 
-**POST /api/v1/sessions/:id/end**
+**POST /api/v1/sessions/{sessionId}**
 - `{ ok = true }`
 
-**POST /api/v1/questions/next**
+**POST /api/v1/questions**
 - Returns mock math questions (multiple choice or numeric)
 - Stores expected answer in `raw.expectedAnswer`
 
-**POST /api/v1/questions/:id/answer**
+**POST /api/v1/questions/{questionId}**
 - `correct = (answer == expectedAnswer)`
 - `feedback = "Great job!"` or `"Try again."`
 - `masteryUpdates = [{skillCode, previousMastery, newMastery, delta}]`
 
-**POST /api/v1/questions/:id/skip**
+**POST /api/v1/questions/{questionId}/skip**
 - `{ skipped = true }`
 
 **POST /api/v1/hints**
 - Progressive hints from bank
 - `{ hint, hintIndex, totalHints, isLastHint }`
 
-**POST /api/v1/events/batch**
+**POST /api/v1/events**
 - `{ accepted = #events, rejected = 0 }`
 
-**POST /api/v1/link/verify**
+**POST /api/v1/link**
 - If code matches: `{ success = true, student = {...} }`
-- Else: 400 VALIDATION_ERROR
+- Else: 200 with success=false
 
 **GET /api/v1/profile/:robloxUserId**
 - `{ robloxUserId, student?, mastery = [...] }`
